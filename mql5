@@ -1,0 +1,104 @@
+
+// ADR Reversal Indicator MT5
+// Developer: Forex Robot Easy Team
+// Website: forexroboteasy.com
+
+#property indicator_chart_window
+#property indicator_buffers 2
+#property indicator_color1 Red
+#property indicator_color2 Green
+
+extern int ADR_Period = 14;
+
+double ADR_Buffer[];
+double UpperADR_Buffer[];
+double LowerADR_Buffer[];
+
+void OnCalculate(const int rates_total, const int prev_calculated, const datetime &time[], const double &open[], const double &high[], const double &low[], const double &close[], const long &tick_volume[], const long &volume[], const int &spread[])
+{
+    int limit = rates_total - prev_calculated;
+
+    if (limit <= 0)
+        return;
+
+    ArrayResize(ADR_Buffer, rates_total);
+    ArrayResize(UpperADR_Buffer, rates_total);
+    ArrayResize(LowerADR_Buffer, rates_total);
+
+    for (int i = limit - 1; i >= 0; i--)
+    {
+        double adr = CalculateADR(i, high, low);
+        ADR_Buffer[i] = adr;
+
+        double upperADR = high[i] + adr;
+        double lowerADR = low[i] - adr;
+
+        UpperADR_Buffer[i] = upperADR;
+        LowerADR_Buffer[i] = lowerADR;
+    }
+
+    SetIndexBuffer(0, UpperADR_Buffer);
+    SetIndexBuffer(1, LowerADR_Buffer);
+}
+
+double CalculateADR(const int index, const double &high[], const double &low[])
+{
+    double sum = 0.0;
+    
+    for (int i = index; i > index - ADR_Period; i--)
+    {
+        sum += high[i] - low[i];
+    }
+    
+    return sum / ADR_Period;
+}
+
+// Function to generate alerts when price exceeds ADR range
+void GenerateAlerts(const double &price, const double &upperADR, const double &lowerADR)
+{
+    if (price > upperADR)
+    {
+        Alert('Price has exceeded upper ADR range');
+        // Additional code to send email or push notification
+    }
+    else if (price < lowerADR)
+    {
+        Alert('Price has exceeded lower ADR range');
+        // Additional code to send email or push notification
+    }
+}
+
+// Function to draw horizontal lines representing ADR range
+void DrawADRRange(const double &upperADR, const double &lowerADR)
+{
+    ObjectDelete('UpperADRLine');
+    ObjectDelete('LowerADRLine');
+
+    ObjectCreate('UpperADRLine', OBJ_HLINE, 0, 0, upperADR);
+    ObjectSet('UpperADRLine', OBJPROP_COLOR, Red);
+
+    ObjectCreate('LowerADRLine', OBJ_HLINE, 0, 0, lowerADR);
+    ObjectSet('LowerADRLine', OBJPROP_COLOR, Green);
+}
+
+int OnInit()
+{
+    IndicatorSetInteger(INDICATOR_DIGITS, MarketInfo(Symbol(), MODE_DIGITS));
+
+    SetIndexStyle(0, DRAW_LINE);
+    SetIndexStyle(1, DRAW_LINE);
+
+    SetIndexLabel(0, 'Upper ADR');
+    SetIndexLabel(1, 'Lower ADR');
+
+    SetIndexDrawBegin(0, ADR_Period);
+    SetIndexDrawBegin(1, ADR_Period);
+
+    return(INIT_SUCCEEDED);
+}
+
+void OnDeinit(const int reason)
+{
+    ObjectDelete('UpperADRLine');
+    ObjectDelete('LowerADRLine');
+}
